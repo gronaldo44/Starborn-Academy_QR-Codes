@@ -1,36 +1,117 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>QR Generator</title>
-  </head>
-  <body>
-    <h1>QR Code Generator</h1>
 
-    <label>
-      Group:
-      <input id="group" placeholder="A" />
-    </label>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Starborn Academy QR Generator</title>
+</head>
 
-    <label>
-      Period:
-      <input id="period" type="number" placeholder="3" />
-    </label>
+<body>
+  <main class="container app-root" id="appRoot">
+    <header class="header">
+      <h1>Starborn Academy QR Code Generator</h1>
+      <p class="subtle">
+        Generate a single QR manually, or import a CSV to generate a QR for each row.
+      </p>
+    </header>
 
-    <label>
-      Headset #:
-      <input id="headset" type="number" placeholder="12" />
-    </label>
+    <!-- Manual Entry -->
+    <section class="card">
+      <h2 class="card-title">Manual Entry</h2>
 
-    <button id="btn">Generate</button>
+      <div class="grid">
+        <label class="field">
+          <span class="field-label">Group Code (4 digits)</span>
+          <input id="group" class="field-input" inputmode="numeric" placeholder="0004" maxlength="4" />
+        </label>
 
-    <h3>Payload</h3>
-    <pre id="payload"></pre>
+        <label class="field">
+          <span class="field-label">Period</span>
+          <input id="period" class="field-input" type="number" min="1" step="1" placeholder="1" />
+        </label>
 
-    <h3>QR Code</h3>
-    <canvas id="qr"></canvas>
+        <label class="field">
+          <span class="field-label">Headset #</span>
+          <input id="headset" class="field-input" type="number" min="1" step="1" placeholder="48" />
+        </label>
 
-    <script type="module" src="/src/main.js"></script>
-  </body>
+        <label class="field">
+          <span class="field-label">Prefix (class/teacher)</span>
+          <input id="prefix" class="field-input" placeholder="a" maxlength="3" />
+        </label>
+
+        <label class="field">
+          <span class="field-label">Headset Digits (padding)</span>
+          <input id="pad" class="field-input" type="number" min="2" max="5" step="1" value="3" />
+        </label>
+      </div>
+
+      <div class="actions">
+        <button id="btn" class="btn" type="button">Generate</button>
+        <button id="download" class="btn btn-secondary" type="button">Download PNG</button>
+        <button id="printManual" class="btn btn-secondary" type="button">Print This QR</button>
+      </div>
+    </section>
+
+    <!-- Manual Output -->
+    <section class="card">
+      <h2 class="card-title">Manual Output</h2>
+
+      <div class="output-grid">
+        <div>
+          <h3 class="section-title">Computed Username</h3>
+          <pre id="username" class="code">(click Generate)</pre>
+        </div>
+
+        <div>
+          <h3 class="section-title">QR Payload (JSON)</h3>
+          <pre id="payload" class="code">(click Generate)</pre>
+        </div>
+      </div>
+
+      <div class="qr-wrap">
+        <h3 class="section-title">QR Code</h3>
+        <canvas id="qr" width="256" height="256"></canvas>
+        <p id="status" class="subtle"></p>
+      </div>
+    </section>
+
+    <!-- CSV Import -->
+    <section class="card">
+      <h2 class="card-title">CSV Import</h2>
+      
+      <div class="grid">
+        <label class="field">
+          <span class="field-label">CSV File</span>
+          <input id="csvFile" class="field-input" type="file" accept=".csv,text/csv" />
+          <span class="field-help">Select a .csv file to generate QRs for every row.</span>
+        </label>
+      </div>
+
+      <div class="actions">
+        <button id="csvGenerate" class="btn" type="button">Generate QRs from CSV</button>
+        <button id="csvClear" class="btn btn-secondary" type="button">Clear Results</button>
+        <button id="csvPrint" class="btn btn-secondary" type="button">Print CSV QRs</button>
+        <button id="cancelExport" class="btn btn-secondary" type="button" style="display:none;">
+          Cancel PDF Export
+        </button>
+      </div>
+
+      <p id="csvStatus" class="subtle mt10"></p>
+    </section>
+
+    <!-- CSV Results -->
+    <section class="card">
+      <h2 class="card-title">CSV Results</h2>
+      <div id="csvResults" class="results"></div>
+    </section>
+  </main>
+
+  <!-- Print-only content gets generated into here -->
+  <div id="printRoot" class="print-root" aria-hidden="true"></div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+
 </html>
