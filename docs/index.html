@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>QR Generator</title>
+    <script type="module" crossorigin src="/Starborn-Academy_QR-Codes/assets/index-gQ_CaAHW.js"></script>
+  </head>
+  <body>
+    <h1>QR Code Generator</h1>
+
+    <label>
+      Group:
+      <input id="group" placeholder="A" />
+    </label>
+
+    <label>
+      Period:
+      <input id="period" type="number" placeholder="3" />
+    </label>
+
+    <label>
+      Headset #:
+      <input id="headset" type="number" placeholder="12" />
+    </label>
+
+    <button id="btn">Generate</button>
+
+    <h3>Payload</h3>
+    <pre id="payload"></pre>
+
+    <h3>QR Code</h3>
+    <canvas id="qr"></canvas>
+
+  </body>
+</html>
