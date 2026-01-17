@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Starborn Academy QR Generator</title>
-  <script type="module" crossorigin src="/Starborn-Academy_QR-Codes/assets/index-BKdQS39O.js"></script>
+  <script type="module" crossorigin src="/Starborn-Academy_QR-Codes/assets/index-BzlF0jIS.js"></script>
   <link rel="stylesheet" crossorigin href="/Starborn-Academy_QR-Codes/assets/index-BgYdmZ1K.css">
 </head>
 
@@ -82,7 +82,7 @@
     <!-- CSV Import -->
     <section class="card">
       <h2 class="card-title">CSV Import</h2>
-      
+
       <div class="grid">
         <label class="field">
           <span class="field-label">CSV File</span>
@@ -100,6 +100,10 @@
         </button>
       </div>
 
+      <p class="subtle mt10" id="popupHint">
+        Printing CSV QRs opens PDFs in new tabs. Please enable pop-ups for this site.
+      </p>
+
       <p id="csvStatus" class="subtle mt10"></p>
     </section>
 
@@ -112,7 +116,7 @@
 
   <!-- Print-only content gets generated into here -->
   <div id="printRoot" class="print-root" aria-hidden="true"></div>
-
+
 </body>
 
 </html>

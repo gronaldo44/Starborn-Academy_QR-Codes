@@ -3,7 +3,13 @@ import QRCode from "qrcode";
 
 import { buildUsername, normalizeGroupCode, toInt } from "./scripts/login.js";
 import { buildPayload } from "./scripts/payload.js";
-import { parseCsvFile, normalizeCsvRow, extractMasterUsernames } from "./scripts/csv.js";
+import {
+  parseCsvFile,
+  normalizeCsvRow,
+  extractMasterUsernames,
+  isProbablyHeaderRow,
+  arraysToHeaderObjects,
+} from "./scripts/csv.js";
 import { buildQrPdfBatchedAndOpenWithProgress } from "./scripts/pdf.js";
 
 const els = {
@@ -42,6 +48,11 @@ const exportJob = {
   running: false,
   cancelRequested: false,
 };
+
+function tryOpen(url) {
+  const w = window.open(url, "_blank", "noopener,noreferrer");
+  return !!w;
+}
 
 /**
  * On-page warning message (no browser alert/confirm).
@@ -123,7 +134,9 @@ function readRowAsInput(rowObj) {
   const headsetNumber = toInt(rowObj.headset);
 
   const prefix = (rowObj.prefix ?? "").toString().trim() || "a";
-  const headsetPad = Number.isFinite(toInt(rowObj.pad)) ? toInt(rowObj.pad) : 3;
+
+  const padInt = toInt(rowObj.pad);
+  const headsetPad = Number.isFinite(padInt) ? padInt : 3;
 
   if (!groupCode || groupCode.length !== 4) throw new Error("Bad group code (expected 4 digits).");
   if (!Number.isFinite(period) || period < 1) throw new Error("Bad period (expected positive integer).");
@@ -231,14 +244,11 @@ async function generateFromCsv() {
 
   els.csvStatus.textContent = "Parsing CSV...";
 
-  // We ALWAYS parse both ways:
-  // 1) header:true for “normal” row-per-user CSVs (works even if no header sometimes, but may create weird keys)
-  // 2) header:false for master matrix extraction
-  const rawHeaderRows = await parseCsvFile(file, { hasHeader: true });
-  const rawArrayRows = await parseCsvFile(file, { hasHeader: false });
+  // Parse ONCE as arrays so we can detect master matrix OR header CSV without re-parsing.
+  const rawRows = await parseCsvFile(file, { hasHeader: false });
 
   // 1) Try master matrix first
-  const masterItems = extractMasterUsernames(rawArrayRows);
+  const masterItems = extractMasterUsernames(rawRows);
 
   if (masterItems.length > 0) {
     const PREVIEW_LIMIT = 80;
@@ -250,13 +260,11 @@ async function generateFromCsv() {
     for (let i = 0; i < masterItems.length; i++) {
       try {
         const { groupCode, username } = masterItems[i];
-
         const payload = buildPayload({ groupCode, username });
 
         // Only render previews for the first N to avoid lag
-        let canvas = null;
         if (i < PREVIEW_LIMIT) {
-          canvas = document.createElement("canvas");
+          const canvas = document.createElement("canvas");
           canvas.width = 256;
           canvas.height = 256;
           await renderQRToCanvas(canvas, payload, 256);
@@ -283,10 +291,22 @@ async function generateFromCsv() {
   }
 
   // 2) Fallback: row-per-user CSV flow
-  // Normalize rows from header mode object rows
-  const rows = rawHeaderRows
-    .map((r) => normalizeCsvRow(r, { hasHeader: true }))
-    .filter((r) => (r.group ?? "") !== "" || (r.period ?? "") !== "" || (r.headset ?? "") !== "");
+  // Decide whether row0 is a header row
+  const hasHeader = isProbablyHeaderRow(rawRows?.[0]);
+
+  let normalized;
+  if (hasHeader) {
+    // Convert arrays -> objects using normalized header keys, then normalize
+    const objRows = arraysToHeaderObjects(rawRows);
+    normalized = objRows.map((r) => normalizeCsvRow(r, { hasHeader: true }));
+  } else {
+    // Treat each row as positional columns: group, period, headset, prefix?, pad?
+    normalized = rawRows.map((r) => normalizeCsvRow(r, { hasHeader: false }));
+  }
+
+  const rows = normalized.filter(
+    (r) => (r.group ?? "") !== "" || (r.period ?? "") !== "" || (r.headset ?? "") !== ""
+  );
 
   if (rows.length === 0) {
     els.csvStatus.textContent = "No usable rows found in CSV.";

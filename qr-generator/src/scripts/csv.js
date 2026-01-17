@@ -37,16 +37,73 @@ function carryForward(values) {
 }
 
 /**
- * Parses any CSV file into either:
- * - array of objects (header mode)
- * - array of arrays (no header)
+ * Heuristic: first row contains at least 2 known-ish column labels.
+ * Used to detect header CSVs without re-parsing.
  */
-export function parseCsvFile(file, { hasHeader = true } = {}) {
+export function isProbablyHeaderRow(row) {
+  if (!Array.isArray(row) || row.length < 2) return false;
+
+  const keys = row.map((c) => normalizeKey(cellStr(c)));
+  const known = new Set([
+    "group",
+    "group_code",
+    "groupcode",
+    "period",
+    "per",
+    "headset",
+    "headset_number",
+    "headsetnumber",
+    "headset_no",
+    "headset_num",
+    "prefix",
+    "pad",
+    "padding",
+    "headset_digits",
+    "headset_pad",
+  ]);
+
+  let hits = 0;
+  for (const k of keys) if (known.has(k)) hits++;
+  return hits >= 2;
+}
+
+/**
+ * Convert array-rows into objects based on the first row as headers.
+ * Header keys are normalized the same way Papa's transformHeader would.
+ */
+export function arraysToHeaderObjects(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return [];
+
+  const header = rows[0].map((h) => normalizeKey(h));
+  const out = [];
+
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (!Array.isArray(r)) continue;
+
+    const obj = {};
+    for (let c = 0; c < header.length; c++) {
+      const key = header[c];
+      if (!key) continue;
+      obj[key] = r[c];
+    }
+    out.push(obj);
+  }
+
+  return out;
+}
+
+/**
+ * Parses CSV file into either:
+ * - array of arrays (header:false)
+ * - array of objects (header:true) [not required by main.js anymore, but kept for flexibility]
+ */
+export function parseCsvFile(file, { hasHeader = false } = {}) {
   return new Promise((resolve, reject) => {
     Papa.parse(file, {
       header: hasHeader,
       skipEmptyLines: "greedy",
-      transformHeader: (h) => normalizeKey(h),
+      transformHeader: hasHeader ? (h) => normalizeKey(h) : undefined,
       complete: (results) => {
         if (results.errors?.length) {
           reject(new Error(results.errors[0].message || "CSV parse error"));
@@ -60,41 +117,51 @@ export function parseCsvFile(file, { hasHeader = true } = {}) {
 }
 
 /**
- * NEW: Extracts (groupCode, username) pairs from the “Usernames Master” matrix.
+ * Extracts (groupCode, username) pairs from the “Usernames Master” matrix.
  *
  * Expected structure:
  *  - a row where col A = "Group code"
- *  - a row where col A = "Class periods" (optional, we don’t need it for payload)
  *  - a row where col A = "Usernames"
  *  - subsequent rows continue listing usernames in the same columns
  *
  * Output: [{ groupCode, username }, ...]
  */
 export function extractMasterUsernames(rawRows) {
-  // rawRows must be arrays (header:false)
   if (!Array.isArray(rawRows) || !Array.isArray(rawRows[0])) return [];
 
-  const groupRowIndex = rawRows.findIndex((r) => isRowLabel(r, "Group code"));
-  const usernamesRowIndex = rawRows.findIndex((r) => isRowLabel(r, "Usernames"));
+  let groupRowIndex = -1;
+  let usernamesRowIndex = -1;
+
+  for (let i = 0; i < rawRows.length; i++) {
+    const r = rawRows[i];
+    if (!Array.isArray(r) || r.length === 0) continue;
+
+    const label = normalizeKey(cellStr(r[0]));
+    if (label === "group_code") groupRowIndex = i;
+    else if (label === "usernames") usernamesRowIndex = i;
+
+    if (groupRowIndex >= 0 && usernamesRowIndex >= 0) break;
+  }
 
   if (groupRowIndex < 0 || usernamesRowIndex < 0) return [];
 
   const groupRow = rawRows[groupRowIndex];
-  const groupCodes = carryForward(groupRow.slice(1).map(cellStr)); // columns B..end
+  const groupCodes = carryForward(groupRow.slice(1).map(cellStr));
+  const maxCols = groupCodes.length;
 
   const out = [];
 
-  // usernames start on the "Usernames" row and continue below it
-  for (let r = usernamesRowIndex; r < rawRows.length; r++) {
+  // usernames start *after* the "Usernames" row
+  for (let r = usernamesRowIndex + 1; r < rawRows.length; r++) {
     const row = rawRows[r];
-    // skip if row is too short
     if (!Array.isArray(row) || row.length < 2) continue;
 
-    for (let c = 1; c < row.length; c++) {
+    const cols = Math.min(maxCols, row.length - 1);
+    for (let c = 1; c <= cols; c++) {
       const username = cellStr(row[c]);
-      const groupCode = cellStr(groupCodes[c - 1]);
-
       if (!username) continue;
+
+      const groupCode = cellStr(groupCodes[c - 1]);
       if (!groupCode) continue;
 
       out.push({ groupCode, username });
@@ -105,7 +172,7 @@ export function extractMasterUsernames(rawRows) {
 }
 
 /**
- * Old behavior: Converts raw CSV row -> normalized input object:
+ * Converts raw CSV row -> normalized input object:
  * { group, period, headset, prefix?, pad? }
  *
  * Supports header-based rows and array-based rows (no header).
@@ -113,28 +180,20 @@ export function extractMasterUsernames(rawRows) {
 export function normalizeCsvRow(row, { hasHeader = true } = {}) {
   if (!hasHeader) {
     // row is an array in order: group, period, headset, prefix?, pad?
-    const group = row[0];
-    const period = row[1];
-    const headset = row[2];
-    const prefix = row[3];
-    const pad = row[4];
+    const group = row?.[0];
+    const period = row?.[1];
+    const headset = row?.[2];
+    const prefix = row?.[3];
+    const pad = row?.[4];
     return { group, period, headset, prefix, pad };
   }
 
   // row is an object with normalized keys
-  const r = row;
+  const r = row || {};
 
   const group = pick(r, ["group", "group_code", "groupcode"]);
   const period = pick(r, ["period", "per"]);
-  const headset = pick(r, [
-    "headset",
-    "headset_number",
-    "headsetnumber",
-    "headset_no",
-    "headsetnumber_",
-    "headset_number_",
-    "headset-number",
-  ]);
+  const headset = pick(r, ["headset", "headset_number", "headsetnumber", "headset_no", "headset_num"]);
   const prefix = pick(r, ["prefix", "class_prefix", "teacher_prefix"]);
   const pad = pick(r, ["pad", "padding", "headset_pad", "headset_digits"]);
 
