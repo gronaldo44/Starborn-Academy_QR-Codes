@@ -14,11 +14,6 @@ export function buildUsername({ prefix, headsetNumber, headsetPad }) {
   return `${cleanPrefix}.${paddedHeadset}`;
 }
 
-export function normalizeGroupCode(groupCode) {
-  // Keep digits only and pad to 4 (0004)
-  return padLeft(onlyDigits(groupCode), 4, "0");
-}
-
 export function toInt(value) {
   const n = Number(value);
   return Number.isFinite(n) ? Math.trunc(n) : NaN;

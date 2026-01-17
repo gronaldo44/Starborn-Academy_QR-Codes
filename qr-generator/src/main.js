@@ -1,7 +1,7 @@
 import "./styles/main.css";
 import QRCode from "qrcode";
 
-import { buildUsername, normalizeGroupCode, toInt } from "./scripts/login.js";
+import { buildUsername, toInt } from "./scripts/login.js";
 import { buildPayload } from "./scripts/payload.js";
 import {
   parseCsvFile,
@@ -109,13 +109,12 @@ els.cancelExport?.addEventListener("click", () => {
 });
 
 function readManualForm() {
-  const groupCode = normalizeGroupCode(els.group.value);
+  const groupCode = els.group.value;
   const period = toInt(els.period.value);
   const headsetNumber = toInt(els.headset.value);
   const prefix = (els.prefix.value || "").trim() || "a";
   const headsetPad = toInt(els.pad.value) || 3;
 
-  if (!groupCode || groupCode.length !== 4) throw new Error("Group Code must be 4 digits (ex: 0004).");
   if (!Number.isFinite(period) || period < 1) throw new Error("Period must be a positive integer.");
   if (!Number.isFinite(headsetNumber) || headsetNumber < 1) throw new Error("Headset # must be a positive integer.");
   if (!prefix) throw new Error("Prefix is required.");
@@ -129,7 +128,7 @@ function readManualForm() {
 }
 
 function readRowAsInput(rowObj) {
-  const groupCode = normalizeGroupCode(rowObj.group);
+  const groupCode = rowObj.group;
   const period = toInt(rowObj.period);
   const headsetNumber = toInt(rowObj.headset);
 
