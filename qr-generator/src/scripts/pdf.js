@@ -8,21 +8,21 @@ const DEFAULTS = {
     rows: 4,
     page: "letter",
     unit: "in",
-    margin: 0.5,
-    gap: 0.25,
+    margin: 0.2,
+    gap: 0.1,
 
     // cell styling
-    pad: 0.12,
-    dashInset: 0.08,
-    cropLen: 0.18, // crop mark length
+    pad: 0.08,
+    dashInset: 0.07,
+    cropLen: 0.10, // crop mark length
 
     // QR
     qrEcl: "M",
     qrPx: 512, // raster size embedded into PDF (sharp printing)
 
     // Header styling (inches)
-    headerTopPad: 0.06,
-    headerBlockH: 0.72, // space reserved above QR (tweak if you want)
+    headerTopPad: 0.12,
+    headerBlockH: 0.98, 
 };
 
 const qrDataUrlCache = new Map(); // key -> dataUrl
@@ -118,40 +118,56 @@ function drawCenteredMixedLine(doc, centerX, y, leftText, rightText, leftStyle, 
     }
 }
 
-function drawHeader(doc, x, y, w, opts, groupCode, username) {
-    const centerX = x + w / 2;
+function drawHeader(doc, x, y, w, opts, groupCode, username, teacher, period) {
+  const centerX = x + w / 2;
 
-    // Top line: "Starborn Academy"
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.text("Starborn Academy", centerX, y, { align: "center" });
+  // Move down slightly to avoid clipping
+  const y0 = y + 0.06;
 
-    // Big lines
-    doc.setFontSize(16);
+  // Top line: "Starborn Academy"
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.text("Starborn Academy", centerX, y0, { align: "center" });
 
-    // "Group Code: 0004" with underlined 0004
-    drawCenteredMixedLine(
-        doc,
-        centerX,
-        y + 0.28,
-        "Group Code: ",
-        String(groupCode ?? ""),
-        "bold",
-        "normal",
-        true
-    );
+  // Big lines
+  doc.setFontSize(16);
 
-    // "Username: a.048" with underlined a.048
-    drawCenteredMixedLine(
-        doc,
-        centerX,
-        y + 0.56,
-        "Username: ",
-        String(username ?? ""),
-        "bold",
-        "normal",
-        true
-    );
+  // Username first (underlined value)
+  drawCenteredMixedLine(
+    doc,
+    centerX,
+    y0 + 0.28,
+    "Username: ",
+    String(username ?? ""),
+    "bold",
+    "normal",
+    true
+  );
+
+  // Group Code second (underlined value)
+  drawCenteredMixedLine(
+    doc,
+    centerX,
+    y0 + 0.56,
+    "Group Code: ",
+    String(groupCode ?? ""),
+    "bold",
+    "normal",
+    true
+  );
+
+  // Teacher + Period line (smaller)
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+
+  const parts = [];
+  if (teacher) parts.push(`Teacher: ${teacher}`);
+  if (period) parts.push(`Period: ${period}`);
+  const line = parts.join("   •   ");
+
+  if (line) {
+    doc.text(line, centerX, y0 + 0.74, { align: "center" });
+  }
 }
 
 export async function buildQrPdf(items, userOpts = {}) {
@@ -218,7 +234,7 @@ export async function buildQrPdf(items, userOpts = {}) {
 
             // Header block (like your screenshot)
             const headerY = innerY + opts.headerTopPad;
-            drawHeader(doc, innerX, headerY, innerW, opts, it.groupCode, it.username);
+            drawHeader(doc, innerX, headerY, innerW, opts, it.groupCode, it.username, it.teacher, it.period);
 
             // QR area below header
             const qrTop = innerY + opts.headerBlockH;

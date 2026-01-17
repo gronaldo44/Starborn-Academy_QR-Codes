@@ -16,6 +16,7 @@ const els = {
   // manual inputs
   group: document.getElementById("group"),
   period: document.getElementById("period"),
+  teacher: document.getElementById("teacher"),
   headset: document.getElementById("headset"),
   prefix: document.getElementById("prefix"),
   pad: document.getElementById("pad"),
@@ -111,6 +112,7 @@ els.cancelExport?.addEventListener("click", () => {
 function readManualForm() {
   const groupCode = els.group.value;
   const period = toInt(els.period.value);
+  const teacher = (els.teacher?.value || "").trim();
   const headsetNumber = toInt(els.headset.value);
   const prefix = (els.prefix.value || "").trim() || "a";
   const headsetPad = toInt(els.pad.value) || 3;
@@ -118,13 +120,12 @@ function readManualForm() {
   if (!Number.isFinite(period) || period < 1) throw new Error("Period must be a positive integer.");
   if (!Number.isFinite(headsetNumber) || headsetNumber < 1) throw new Error("Headset # must be a positive integer.");
   if (!prefix) throw new Error("Prefix is required.");
+  if (!teacher) throw new Error("Teacher Name is required for printing.");
 
   const username = buildUsername({ prefix, headsetNumber, headsetPad });
-
-  // NEW payload format: version/username/groupcode
   const payload = buildPayload({ groupCode, username });
 
-  return { groupCode, period, headsetNumber, prefix, headsetPad, username, payload };
+  return { groupCode, period, teacher, headsetNumber, prefix, headsetPad, username, payload };
 }
 
 function readRowAsInput(rowObj) {
@@ -182,7 +183,12 @@ function makeResultCard({ index, input, canvas }) {
 
   const meta = document.createElement("p");
   meta.className = "result-meta";
-  meta.textContent = `Group ${input.groupCode}${input.period ? ` • Period ${input.period}` : ""}${input.headsetNumber ? ` • Headset ${input.headsetNumber}` : ""}`;
+  meta.textContent =
+    `Group ${input.groupCode}` +
+    `${input.username ? ` • ${input.username}` : ""}` +
+    `${input.teacher ? ` • Teacher ${input.teacher}` : ""}` +
+    `${input.period ? ` • Period ${input.period}` : ""}` +
+    `${input.headsetNumber ? ` • Headset ${input.headsetNumber}` : ""}`;
   card.appendChild(meta);
 
   canvas.className = "result-canvas";
@@ -220,7 +226,7 @@ function makeResultCard({ index, input, canvas }) {
 
 async function generateManual() {
   els.status.textContent = "";
-  const { groupCode, period, headsetNumber, username, payload } = readManualForm();
+  const { groupCode, period, teacher, headsetNumber, username, payload } = readManualForm();
 
   els.username.textContent = username;
   els.payload.textContent = payload;
@@ -228,7 +234,7 @@ async function generateManual() {
   await renderQRToCanvas(els.canvas, payload, 256);
   els.status.textContent = "QR generated.";
 
-  lastManualPrintItem = { payload, groupCode, username };
+  lastManualPrintItem = { payload, groupCode, username, teacher, period };
 }
 
 async function generateFromCsv() {
@@ -258,7 +264,8 @@ async function generateFromCsv() {
 
     for (let i = 0; i < masterItems.length; i++) {
       try {
-        const { groupCode, username } = masterItems[i];
+        const { groupCode, username, teacher, period } = masterItems[i];
+
         const payload = buildPayload({ groupCode, username });
 
         // Only render previews for the first N to avoid lag
@@ -268,12 +275,27 @@ async function generateFromCsv() {
           canvas.height = 256;
           await renderQRToCanvas(canvas, payload, 256);
 
-          const input = { groupCode, period: "", headsetNumber: "", username, payload };
+          const input = {
+            groupCode,
+            period: period || "",
+            headsetNumber: "",
+            username,
+            payload,
+            teacher: teacher || "",
+          };
+
           const card = makeResultCard({ index: i, input, canvas });
           els.csvResults.appendChild(card);
         }
 
-        csvPrintItems.push({ payload, groupCode, username });
+        csvPrintItems.push({
+          payload,
+          groupCode,
+          username,
+          teacher: teacher || "",
+          period: period || "",
+        });
+
         ok++;
       } catch {
         bad++;
@@ -486,6 +508,7 @@ els.period.value = "1";
 els.headset.value = "48";
 els.prefix.value = "a";
 els.pad.value = "3";
+els.teacher.value = "Doe";
 
 // Auto-generate manual once on load
-generateManual().catch(() => {});
+generateManual().catch(() => { });

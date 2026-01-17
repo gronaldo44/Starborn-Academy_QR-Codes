@@ -129,7 +129,9 @@ export function parseCsvFile(file, { hasHeader = false } = {}) {
 export function extractMasterUsernames(rawRows) {
   if (!Array.isArray(rawRows) || !Array.isArray(rawRows[0])) return [];
 
+  let teacherRowIndex = -1;
   let groupRowIndex = -1;
+  let periodsRowIndex = -1;
   let usernamesRowIndex = -1;
 
   for (let i = 0; i < rawRows.length; i++) {
@@ -137,18 +139,27 @@ export function extractMasterUsernames(rawRows) {
     if (!Array.isArray(r) || r.length === 0) continue;
 
     const label = normalizeKey(cellStr(r[0]));
-    if (label === "group_code") groupRowIndex = i;
+    if (label === "teacher") teacherRowIndex = i;
+    else if (label === "group_code") groupRowIndex = i;
+    else if (label === "class_periods") periodsRowIndex = i;
     else if (label === "usernames") usernamesRowIndex = i;
 
-    if (groupRowIndex >= 0 && usernamesRowIndex >= 0) break;
+    if (teacherRowIndex >= 0 && groupRowIndex >= 0 && periodsRowIndex >= 0 && usernamesRowIndex >= 0) break;
   }
 
+  // Require at least group + usernames to qualify as master
   if (groupRowIndex < 0 || usernamesRowIndex < 0) return [];
 
+  const teacherRow = teacherRowIndex >= 0 ? rawRows[teacherRowIndex] : null;
   const groupRow = rawRows[groupRowIndex];
-  const groupCodes = carryForward(groupRow.slice(1).map(cellStr));
-  const maxCols = groupCodes.length;
+  const periodsRow = periodsRowIndex >= 0 ? rawRows[periodsRowIndex] : null;
 
+  // Columns are B..end (index 1+)
+  const teachers = teacherRow ? carryForward(teacherRow.slice(1).map(cellStr)) : [];
+  const groupCodes = carryForward(groupRow.slice(1).map(cellStr));
+  const periods = periodsRow ? carryForward(periodsRow.slice(1).map(cellStr)) : [];
+
+  const maxCols = groupCodes.length;
   const out = [];
 
   // usernames start *after* the "Usernames" row
@@ -164,7 +175,10 @@ export function extractMasterUsernames(rawRows) {
       const groupCode = cellStr(groupCodes[c - 1]);
       if (!groupCode) continue;
 
-      out.push({ groupCode, username });
+      const teacher = teachers.length ? cellStr(teachers[c - 1]) : "";
+      const period = periods.length ? cellStr(periods[c - 1]) : "";
+
+      out.push({ groupCode, username, teacher, period });
     }
   }
 
